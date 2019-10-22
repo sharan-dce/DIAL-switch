@@ -1,0 +1,26 @@
+Architecture of system:
+
+	Reward System:
+			For each lost point, a reward of -1 will be given to both agents
+			Otherwise, no reward will be given
+
+	Functional Architecture of one network (agent):
+		Input:
+			Chunk of 100 x 100 x 2: Last two screen portions (last two time steps) -- 200 x 200 pixels in total: only a portion of which will be shown to each paddle
+				So 100 x 100 x 2 will be the full input
+			d: Apart from that, we have a message given to it, of d dimensions, which is directly fed to the fully connected part.
+
+		Output:
+			3: Q values: 3 Actions -- (no_op(0), up(1), down(2))
+			k: One k dimensional output: the message to be passed to the global interpreter network
+
+	Functional Architecture of central network:
+		Input:
+			k x NO_AGENTS: Inputs from the NO_AGENTS agents
+
+		Output:
+			d: d dimensional output to be broadcasted
+
+We will use multiple agents, in this case 2 
+Record current episode- backpropagation will take care of the rest
+Study the correlation between the message exchanged and the input
