@@ -21,10 +21,10 @@ class Agent:
 
 		self.__flag__ = True
 
-	def __call__(self, view_input, mesg_input, tape = None):	#returns q values, message_vector
+	def __call__(self, view_input, mesg_input):	#returns q values, message_vector
 		output_tensor = tf.concat([view_input, mesg_input], axis = -1)
-		for layer in self.layers[: 3]:
-			output_tensor = layer(output_tensor, tape)
+		for layer in self.layers:
+			output_tensor = layer(output_tensor)
 		if self.__flag__:
 			self.__flag__ = False
 			self.trainable_variables = []

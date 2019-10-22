@@ -30,15 +30,12 @@ class LSTM:
 		self.__flag__ = True
 
 
-	def __call__(self, input_tensor, tape = None):
+	def __call__(self, input_tensor):
 
 		if self.__flag__:
 			batch_size = input_tensor.shape[0]
 			self.output = tf.zeros([batch_size, self.units])
 			self.cell = tf.zeros([batch_size, self.units])
-			if tape != None:
-				tape.watch(self.cell)
-				tape.watch(self.output)
 		self.cell *= self.forget_gate(input_tensor, self.output)
 		self.cell += self.input_gate(input_tensor, self.output) * self.cell_gate(input_tensor, self.output)
 		self.output = self.output_gate(input_tensor, self.output) * tf.nn.tanh(self.cell)

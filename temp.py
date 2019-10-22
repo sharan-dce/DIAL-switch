@@ -8,14 +8,11 @@
 # import time
 # time.sleep(3)
 import tensorflow as tf
-from agent import Agent
-
-agent = Agent(10, 10)
-
-a = tf.zeros([1, 10])
-b = tf.zeros([1, 12])
-with tf.GradientTape() as tape:
-	output = agent(a, b, tape)
-
-grads = tape.gradient(output, agent.trainable_variables)
-print(grads)
+xz = tf.ones([])
+c = tf.Variable(1.0)
+with tf.GradientTape() as g:
+  g.watch(xz)
+  x = xz + c
+  y = x * x
+dy_dx, dy_dxz = g.gradient(y, [x, xz]) # Will compute to 6.0
+print(dy_dx, dy_dxz)
