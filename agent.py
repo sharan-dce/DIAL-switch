@@ -13,9 +13,9 @@ class Agent:
 		self.layers.append(tf.keras.layers.LSTM(64))
 		self.layers.append(tf.keras.layers.LSTM(32))
 
-		self.q_values = tf.keras.layers.Dense(output_q_values)
+		self.q_values = tf.keras.layers.Dense(output_q_values, kernel_initializer = tf.random_normal_initializer)
 
-		self.message = tf.keras.layers.Dense(output_mesg_dims, activation = tf.nn.tanh)
+		self.message = tf.keras.layers.Dense(output_mesg_dims, activation = tf.nn.tanh, kernel_initializer = tf.random_normal_initializer)
 
 		self.all_layers = self.layers + [self.q_values, self.message]
 
@@ -33,5 +33,5 @@ class Agent:
 		return self.q_values(output_tensor), self.message(output_tensor)
 
 	def reset(self):
-		for layer in self.all_layers[1:]:
+		for layer in self.all_layers[: -2]:
 			layer.reset()

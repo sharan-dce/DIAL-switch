@@ -3,8 +3,8 @@ import tensorflow as tf
 class DoubleLinear:
 	def __init__(self, units, activation = None):
 		self.units = units
-		self.w = tf.keras.layers.Dense(self.units)
-		self.u = tf.keras.layers.Dense(self.units, use_bias = False)
+		self.w = tf.keras.layers.Dense(self.units, kernel_initializer = tf.random_normal_initializer)
+		self.u = tf.keras.layers.Dense(self.units, use_bias = False, kernel_initializer = tf.random_normal_initializer)
 		self.activation = activation
 
 		self.__flag__ = True

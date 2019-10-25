@@ -5,83 +5,80 @@ from mediator import Mediator
 import numpy as np
 import tensorflow as tf
 from multi_step_mnist import MultiStepMNIST
+import autoencoder
+from dru import dru
 
 def sample_action(alpha, q_values):	 # alpha is the probability with which the agent takes a random action
-	if(np.random.uniform() < alpha):
-		return np.random.randint(q_values.shape[-1])
-	else:
-		return tf.argmax(q_values, axis = 1).numpy().item()
+# returns shape [target_agent]
+	result = []
+	for L in range(0, len(q_values), 10):
+		q_value = q_values[L: L + len(q_values)]
 
-def print_summary(record):
-	print('Train Episode {:7d}:	Reward: {:7.4f}		Timesteps: {:4d}'.format(episodes, sum(record['rewards']), len(record['rewards'])))
+		if(np.random.uniform() < alpha):
+			result.append(tf.constant(np.random.randint(q_value.shape[-1])))
+		else:
+			result.append(tf.argmax(q_value, axis = 1)[0])
+	return result
+
+def print_summary(episode, record):
+	print('Train Episode {:7d}:	Reward: {:7.4f}'.format(episodes, sum(record['rewards'])))
 
 
-def play_episode(agents, mediator, environment, tape = None):
-	
-	# these are q value tensor outputs and message tensor outputs at each timestep of an episode
-	# we will record each tensor in these lists so as to access them later, or even return them
-	record = {
-		'q_values': [],
-		'messages_a': [],
-		'messages_b': [],
-		'actions_a': [],
-		'actions_b': [],
-		'rewards': [],
-		'message_broadcasts': [tf.zeros([1, config.AGENT_MESG_INPUT_DIMS])]
-	}
+def play_episode(agents, mediator, environments, encoder):
+	assert len(agents) == len(environments), "Unequal no of environments and agents"
+	for i in range(len(agents)):
+		agents[i].reset()
+		environments[i].reset()
+	encodings = list(map(lambda env: encoder(env.image), environments))
+
+	broadcasted_message = tf.constant(np.random.normal(scale = config.MESSAGE_NOISE_STDDEV, size = [1, config.AGENT_MESG_INPUT_DIMS]).astype(np.float32))
+
+	cumulated_q_values = []		# time_steps x agents x (agents * 10)
+	final_rewards = []			# environments x agents
 	done = False
-	if tape != None:
-		tape.watch(record['message_broadcasts'][-1])
-	time = 0
+	cumulated_actions = []
+
 	while not done:
-		if tape != None:
-			tape.watch(states[-1])
-		state_a = states[-1][:, : config.VIEW_L, :]
-		state_b = states[-1][:, -config.VIEW_R: , :]
-		q_values, message = agents[0].forward_prop(state_a, record['message_broadcasts'][-1])
-		record['q_values_a'].append(q_values)
-		record['messages_a'].append(message)
-		q_values, message = agents[1].forward_prop(state_b, record['message_broadcasts'][-1])
-		record['q_values_b'].append(q_values)
-		record['messages_b'].append(message)
-		# now run through mediator
-		message_list = [record['messages_a'][-1], record['messages_b'][-1]]
-		message = mediator.forward_prop(message_list)
-		record['message_broadcasts'].append(message)
+		q_values = []
+		messages = []
+		for i, agent in enumerate(agents):
+			q_value, message = agent(encodings[i], broadcasted_message)
+			q_values.append(q_value)
+			messages.append(message)
+		cumulated_q_values.append(q_values)
+		return
+		# add noise to the channel
+		noisy_messages = [dru(message, config.MESSAGE_NOISE_STDDEV, training) for message in messages]
+		mediator_output = mediator(noisy_messages)
+		noisy_mediator_output = dru(mediator_output, training)
+		broadcasted_message = noisy_mediator_output
+		sampled_actions = [sample_action(config.EXPLORE_PROB, q_value) for q_value in q_values]	# agents x agents(action)
+		cumulated_actions.append(sampled_actions)		# time_steps x agents x agents(actions)
+		for i in range(len(sampled_actions)):
+			actions_on_environment_i = sampled_actions[:][i]
 
-		# now get the next state, run this info through the agents and remove the preivous to previous screen from states vairable
-		action_a = sample_action(config.EXPLORE_PROB, record['q_values_a'][-1])
-		action_b = sample_action(config.EXPLORE_PROB, record['q_values_b'][-1])
-		record['actions_a'].append(action_a)
-		record['actions_b'].append(action_b)
-		pong.render()
-		reward, done = pong.step(action_a, action_b)
-		record['rewards'].append(tf.Variable(reward))
-		new_state = np.expand_dims(np.expand_dims(pong.get_screen(), axis = -1), axis = 0)
-		states.append(tf.concat([states[-1][:, :, :, -1:], new_state], axis = -1))
-		time += 1
+			rewards, done = environments[i].step(actions_on_environment_i)
+			if rewards != None:
+				final_rewards.append(rewards)
 
-	# compute losses
-	if get_loss:
-		if tape != None:
-			tape.watch(record['rewards'][-1])
-		loss_a = tf.square(record['q_values_a'][-1][0, record['actions_a'][-1]] - record['rewards'][-1])
-		loss_b = tf.square(record['q_values_b'][-1][0, record['actions_b'][-1]] - record['rewards'][-1])
-		for t in range(len(record['q_values_a']) - 1):
-			if tape != None:
-				tape.watch(record['rewards'][t])
-			loss_a += tf.square(record['q_values_a'][t][0, record['actions_a'][t]] - (record['rewards'][t] + config.DISCOUNT_FACTOR * tf.reduce_max((record['q_values_a'][t + 1])) )	)
-			loss_b += tf.square(record['q_values_b'][t][0, record['actions_b'][t]] - (record['rewards'][t] + config.DISCOUNT_FACTOR * tf.reduce_max((record['q_values_b'][t + 1])) )	)
-		record['loss_a'] = loss_a
-		record['loss_b'] = loss_b
-	return record
+	# compute loss
+	loss = tf.constant(0.0)
+	for time_step in range(len(cumulated_actions) - 1):
+		for agent in len(agents):
+			target = cumulated_q_values[time_step + 1][agent]
+			for L in range(0, len(10 * config.NO_AGENTS), 10):
+				loss += tf.square(tf.reduce_max(target[L: L + 10]) - cumulated_q_values[time_step][agent][L: L + 10])
+	return loss
+			
+
 
 
 def main():
 	environments = []
 	agents = []
+	encoder = autoencoder.warmup()
 	# Get environments
-	for _ in range(NO_AGENTS):
+	for _ in range(config.NO_AGENTS):
 		environments.append(MultiStepMNIST('Environment-{}'.format(_), config.CORRECT_REWARDS[_], config.INCORRECT_REWARDS[_]))
 		agents.append(Agent(10 * (config.NO_AGENTS), config.AGENT_MESG_OUTPUT_DIMS))
 
@@ -89,25 +86,25 @@ def main():
 
 	optimizer = tf.keras.optimizers.RMSprop(learning_rate = config.LEARNING_RATE)
 
-	# to initialize, we run a random episode
-	play_episode(agents, mediator, environments)
+	# # to initialize, we run a random episode
+	play_episode(agents, mediator, environments, encoder)
 
-	episodes = 0
-	while(True):
-		with tf.GradientTape() as tape:
-			record = play_episode(agents, mediator, environments, tape)
-			loss = sum(record['loss'])
-		trainable_variables = []
-		for agent in agents:
-			trainable_variables += list(map(lambda x: x.trainable_variables, agent.all_layers))
-		trainable_variables += list(map(lambda x: x.trainable_variables, mediator.all_layers))
-		grads = tape.gradient(loss, trainable_variables)
-		optimizer.apply_gradients(zip(grads, trainable_variables))
-		episodes += 1
-		print_summary(record)
+	# episodes = 0
+	# while(True):
+	# 	with tf.GradientTape() as tape:
+	# 		record = play_episode(agents, mediator, environments, encoder)
+	# 		loss = sum(record['loss'])
+	# 	trainable_variables = mediator.trainable_variables
+	# 	for agent in agents:
+	# 		trainable_variables += agent.trainable_variables
 
-		if episodes % config.EPISODES_TO_TRAIN == 0:
-			record = play_episode(agents, mediator, pong, False)
-			print_summary(record)
+	# 	grads = tape.gradient(loss, trainable_variables)
+	# 	optimizer.apply_gradients(zip(grads, trainable_variables))
+	# 	episodes += 1
+	# 	print_summary(episode, record)
+
+	# 	if episodes % config.EPISODES_TO_TRAIN == 0:
+	# 		record = play_episode(agents, mediator, pong)
+	# 		print_summary(episode, record)
 
 main()

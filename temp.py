@@ -8,11 +8,10 @@
 # import time
 # time.sleep(3)
 import tensorflow as tf
-xz = tf.ones([])
-c = tf.Variable(1.0)
+import numpy as np
+x = np.asarray(3.0)
 with tf.GradientTape() as g:
-  g.watch(xz)
-  x = xz + c
+  # g.watch(x)
   y = x * x
-dy_dx, dy_dxz = g.gradient(y, [x, xz]) # Will compute to 6.0
-print(dy_dx, dy_dxz)
+dy_dx = g.gradient(y, x) # Will compute to 6.0
+print(dy_dx)

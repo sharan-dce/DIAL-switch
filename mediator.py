@@ -4,10 +4,10 @@ class Mediator:
 	def __init__(self, output_dims):
 		self.output_dims = output_dims
 		self.layers = []
-		self.layers.append(tf.keras.layers.Dense(units = 8, activation = tf.nn.relu))
-		self.layers.append(tf.keras.layers.Dense(units = 16, activation = tf.nn.relu))
-		self.layers.append(tf.keras.layers.Dense(units = 8, activation = tf.nn.relu))
-		self.layers.append(tf.keras.layers.Dense(units = output_dims, activation = tf.nn.tanh))
+		self.layers.append(tf.keras.layers.Dense(units = 8, activation = tf.nn.relu, kernel_initializer = tf.random_normal_initializer))
+		self.layers.append(tf.keras.layers.Dense(units = 16, activation = tf.nn.relu, kernel_initializer = tf.random_normal_initializer))
+		self.layers.append(tf.keras.layers.Dense(units = 8, activation = tf.nn.relu, kernel_initializer = tf.random_normal_initializer))
+		self.layers.append(tf.keras.layers.Dense(units = output_dims, activation = tf.nn.tanh, kernel_initializer = tf.random_normal_initializer))
 
 		self.__flag__ = True
 
