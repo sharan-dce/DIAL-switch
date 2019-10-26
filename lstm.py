@@ -18,6 +18,13 @@ class DoubleLinear:
 
 		return (self.activation(pre_activation) if self.activation != None else pre_activation)
 
+	def get_weights(self):
+		return [self.w.get_weights(), self.u.get_weights()]
+
+	def set_weights(self, weights):
+		self.w.set_weights(weights[0])
+		self.u.set_weights(weights[1])
+
 class LSTM:
 	def __init__(self, units):
 		self.units = units
@@ -48,3 +55,17 @@ class LSTM:
 
 	def reset(self, batch_size = 1):
 		self.__flag__ = True
+
+	def get_weights(self):
+		weights = []
+		weights.append(self.forget_gate.get_weights())
+		weights.append(self.output_gate.get_weights())
+		weights.append(self.input_gate.get_weights())
+		weights.append(self.cell_gate.get_weights())
+		return weights
+
+	def set_weights(self, weights):
+		self.forget_gate.set_weights(weights[0])
+		self.output_gate.set_weights(weights[1])
+		self.input_gate.set_weights(weights[2])
+		self.cell_gate.set_weights(weights[3])
