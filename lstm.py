@@ -41,8 +41,8 @@ class LSTM:
 
 		if self.__flag__:
 			batch_size = input_tensor.shape[0]
-			self.output = tf.zeros([batch_size, self.units])
-			self.cell = tf.zeros([batch_size, self.units])
+			self.output = tf.random.normal([batch_size, self.units])
+			self.cell = tf.random.normal([batch_size, self.units])
 		self.cell *= self.forget_gate(input_tensor, self.output)
 		self.cell += self.input_gate(input_tensor, self.output) * self.cell_gate(input_tensor, self.output)
 		self.output = self.output_gate(input_tensor, self.output) * tf.nn.tanh(self.cell)
@@ -69,3 +69,44 @@ class LSTM:
 		self.output_gate.set_weights(weights[1])
 		self.input_gate.set_weights(weights[2])
 		self.cell_gate.set_weights(weights[3])
+
+class GRU:
+	def __init__(self, units):
+		self.units = units
+
+		self.z = DoubleLinear(units, tf.nn.sigmoid)
+		self.r = DoubleLinear(units, tf.nn.sigmoid)
+		self.cell_gate = DoubleLinear(units, tf.nn.tanh)
+		self.__flag__ = True
+
+
+	def __call__(self, input_tensor):
+
+		if self.__flag__:
+			batch_size = input_tensor.shape[0]
+			self.output = tf.random.normal([batch_size, self.units])
+
+		zt = self.z(input_tensor, self.output)
+		rt = self.r(input_tensor, self.output)
+		self.output = (1.0 - zt) * self.output + zt * self.cell_gate(input_tensor, self.output * rt)
+
+		if self.__flag__:
+			self.__flag__ = False
+			self.trainable_variables = self.z.trainable_variables + self.r.trainable_variables + self.cell_gate.trainable_variables
+
+		return self.output
+
+	def reset(self, batch_size = 1):
+		self.__flag__ = True
+
+	def get_weights(self):
+		weights = []
+		weights.append(self.z.get_weights())
+		weights.append(self.r.get_weights())
+		weights.append(self.cell_gate.get_weights())
+		return weights
+
+	def set_weights(self, weights):
+		self.z.set_weights(weights[0])
+		self.r.set_weights(weights[1])
+		self.cell_gate.set_weights(weights[2])
