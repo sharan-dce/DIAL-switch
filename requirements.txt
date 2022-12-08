@@ -6,7 +6,7 @@ astor==0.8.0
 beautifulsoup4==4.6.0
 blinker==1.4
 Brlapi==0.6.6
-certifi==2018.1.18
+certifi==2022.12.7
 chardet==3.0.4
 checkbox-support==0.22
 command-not-found==0.3
